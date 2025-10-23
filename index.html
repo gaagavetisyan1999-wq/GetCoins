@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Get Coins — Mobile</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --muted:#e9e9eb;
+    --accent-red:#ff2d55;
+    --gold1: #f7c948;
+    --gold2: #d49a12;
+    --text:#111827;
+    --radius:14px;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+  .app{
+    max-width:420px;
+    margin:0 auto;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    box-sizing:border-box;
+  }
+
+  /* Header */
+  h1{
+    font-size:28px;
+    margin:6px 0 14px 0;
+    font-weight:700;
+    letter-spacing:-0.2px;
+  }
+
+  label{font-size:13px;color:#6b7280;margin-bottom:8px;display:block}
+
+  .input{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border-radius:12px;
+    border:1px solid var(--muted);
+    padding:10px 12px;
+    box-sizing:border-box;
+    background: #fff;
+  }
+  .input input{
+    border:0;outline:0;font-size:16px;width:100%;
+    font-family:inherit;
+  }
+
+  .balance{
+    margin-top:10px;
+    font-size:14px;
+    color:#374151;
+  }
+
+  /* Grid */
+  .grid{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+  }
+  .coin-card{
+    background:#fff;border-radius:12px;border:1px solid var(--muted);
+    padding:10px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:64px; cursor:pointer; user-select:none;
+  }
+  .coin-card.selected{box-shadow:0 6px 18px rgba(0,0,0,0.08); border-color:rgba(212,154,18,0.2)}
+  .coin-value{font-weight:600;margin-top:6px;font-size:14px}
+  .coin-svg{width:28px;height:28px}
+
+  /* Custom button visually same as card */
+  .custom-btn{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600}
+
+  /* Recharge */
+  .spacer{flex:1}
+  .recharge{
+    width:100%;
+    border-radius:14px;
+    padding:14px 18px;
+    background:var(--accent-red);
+    color:#fff;
+    font-weight:700;
+    font-size:16px;
+    border:0;
+    cursor:pointer;
+    box-shadow:0 8px 24px rgba(255,45,85,0.18);
+  }
+
+  /* Modal */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;
+    z-index:40;opacity:0;pointer-events:none;transition:opacity .15s;
+  }
+  .modal-backdrop.show{opacity:1;pointer-events:auto}
+  .modal{
+    background:#fff;border-radius:14px;padding:18px;max-width:360px;width:92%;box-sizing:border-box;
+    box-shadow:0 20px 60px rgba(2,6,23,0.2); text-align:center;
+  }
+  .modal h3{margin:4px 0 10px 0;font-size:16px}
+  .modal input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--muted);font-size:16px}
+  .modal .row{display:flex;gap:10px;margin-top:12px}
+  .btn{flex:1;padding:10px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
+  .btn.ghost{background:#f3f4f6}
+  .btn.primary{background:var(--accent-red);color:#fff}
+
+  /* small */
+  .muted{color:#6b7280;font-size:13px}
+  @media(min-width:460px){
+    .app{padding:28px}
+    h1{font-size:32px}
+  }
+</style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Get Coins">
+    <h1>Get Coins</h1>
+
+    <label for="username">Username</label>
+    <div class="input" aria-hidden="false">
+      <span style="color:var(--muted)">@</span>
+      <input id="username" placeholder="Enter username" type="text" inputmode="text" autocomplete="username" />
+    </div>
+
+    <div class="balance" id="balanceDisplay">Balance: 0 coins</div>
+
+    <div class="grid" id="coinGrid" aria-label="Coin options">
+      <!-- Cards inserted by JS for clarity -->
+    </div>
+
+    <div class="spacer"></div>
+
+    <button class="recharge" id="rechargeBtn">Recharge</button>
+  </div>
+  <!-- Modal: custom -->
+  <div class="modal-backdrop" id="customModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+      <h3>Enter custom coin amount:</h3>
+      <input id="customAmount" type="number" min="1" placeholder="e.g. 5000" />
+      <div class="row">
+        <button class="btn ghost" id="customCancel">Cancel</button>
+        <button class="btn primary" id="customOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: success -->
+  <div class="modal-backdrop" id="successModal" role="alertdialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+      <div style="font-size:28px">✅</div>
+      <h3 id="successText">Payment Successful!</h3>
+      <div class="muted" style="margin-top:6px" id="successSub">Coins have been sent.</div>
+      <div style="margin-top:12px">
+        <button class="btn ghost" id="successClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Data
+  const options = [30,350,700,1400,3500,7000,17500];
+  const grid = document.getElementById('coinGrid');
+
+  // coin SVG generator
+  function coinSVG(){
+    return <svg class="coin-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1">
+          <stop offset="0" stop-color="#f8d36a"/>
+          <stop offset="1" stop-color="#d49a12"/>
+        </linearGradient>
+      </defs>
+      <circle cx="12" cy="12" r="9" fill="url(#g)" stroke="#d49a12" stroke-width="0.8"/>
+      <text x="12" y="15" text-anchor="middle" font-size="9" font-weight="700" fill="#6b3f00">$</text>
+    </svg>;
+  }
+
+  // render cards
+  let selectedValue = null;
+  function renderGrid(){
+    grid.innerHTML = '';
+    options.forEach(val=>{
+      const card = document.createElement('button');
+      card.className = 'coin-card';
+      card.type='button';
+      card.innerHTML = coinSVG() + <div class="coin-value">${val}</div>;
+      card.addEventListener('click', ()=>{ selectCard(val, card) });
+      grid.appendChild(card);
+    });
+
+    const custom = document.createElement('button');
+    custom.className = 'coin-card custom-btn';
+    custom.type='button';
+    custom.innerHTML = coinSVG() + <div class="coin-value">Custom</div>;
+    custom.addEventListener('click', openCustom);
+    grid.appendChild(custom);
+  }
+
+  function selectCard(val, el){
+    selectedValue = val;
+    document.querySelectorAll('.coin-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  // Custom modal
+  const customModal = document.getElementById('customModal');
+  const customAmount = document.getElementById('customAmount');
+  function openCustom(){
+    customAmount.value = '';
+    showModal(customModal,true);
+    customAmount.focus();
+  }
+  function closeCustom(){ showModal(customModal,false); }
+
+  document.getElementById('customCancel').addEventListener('click', closeCustom);
+  document.getElementById('customOk').addEventListener('click', ()=>{
+    const v = parseInt(customAmount.value,10);
+    if(!v || v <= 0) { customAmount.focus(); return; }
+    selectedValue = v;
+    // mark selection visually by creating an ephemeral selection highlight on last custom card
+    document.querySelectorAll('.coin-card').forEach(c=>c.classList.remove('selected'));
+    // highlight the custom card (it's the last child)
+    const last = grid.lastElementChild;
+    if(last) last.classList.add('selected');
+    closeCustom();
+  });
+
+  // Recharge logic
+  const successModal = document.getElementById('successModal');
+  const successText = document.getElementById('successText');
+  const successSub = document.getElementById('successSub');
+  document.getElementById('rechargeBtn').addEventListener('click', ()=>{
+    const username = (document.getElementById('username').value || '').trim();
+    if(!username){
+      // simple inline feedback
+      const inp = document.getElementById('username');
+      inp.focus();
+      // tiny shake
+      inp.style.borderColor = '#ff2d55';
+      setTimeout(()=>{ inp.style.borderColor = ''; },800);
+      return;
+    }
+    if(!selectedValue){
+      // highlight grid
+      grid.style.border = '1px solid #ffb3c4';
+      setTimeout(()=> grid.style.border = '', 800);
+      return;
+    }
+    // show success modal with username
+    successText.textContent = '✅ Payment Successful!';
+    successSub.textContent = Coins have been sent to ${username}.;
+    showModal(successModal,true);
+    // (In real app: call payment API and update backend)
+  });
+
+  document.getElementById('successClose').addEventListener('click', ()=>{ showModal(successModal,false) });
+
+  // modal helper
+  function showModal(el, show){
+    if(show){
+      el.classList.add('show');
+      el.setAttribute('aria-hidden','false');
+    } else {
+      el.classList.remove('show');
+      el.setAttribute('aria-hidden','true');
+    }
+  }
+
+  // init
+  renderGrid();
+
+  // keyboard: close modal on ESC
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape'){ showModal(customModal,false); showModal(successModal,false); }
+  });
+</script>
+</body>
+</html>
